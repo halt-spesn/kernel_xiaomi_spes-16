@@ -816,6 +816,10 @@ config LEDS_QPNP_VIBRATOR_PWM
 	  peripheral found on Qualcomm Technologies, Inc. QPNP PMICs.
 	  The vibrator-pwm peripheral is capable of driving LAR vibrators.
 
+config LEDS_SPES
+        tristate "Flashlight GPIO driver'
+        depends on LEDS_CLASS
+        default y
 
 comment "LED Triggers"
 source "drivers/leds/trigger/Kconfig"
