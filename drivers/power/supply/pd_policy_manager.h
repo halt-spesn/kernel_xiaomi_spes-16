@@ -150,15 +150,17 @@ struct cp_device {
 
 #define PM_STATE_LOG_MAX    32
 struct usbpd_pm {
+	struct device *dev;
+	struct platform_device *pdev;
     struct tcpc_device *tcpc;
     struct notifier_block tcp_nb;
 	struct charger_device *sw_chg;
 	bool is_pps_en_unlock;
     int hrst_cnt;
 	POWER_LIST* pdo;
-    
+
 	enum pm_state state;
-	
+
 	struct cp_device cp;
 	struct cp_device cp_sec;
 

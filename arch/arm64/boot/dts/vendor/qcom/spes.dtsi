@@ -265,12 +265,17 @@ onewire_gpio:
 		status = "ok";
 	};
 	
-maxim_ds28e16:
-        maxim_ds28e16 {
+	maxim_ds28e16: maxim_ds28e16 {
 		compatible = "maxim,ds28e16";
 		label = "max_ds28e16";
 		maxim,version = <1>;
-		status = "ok";
+		status = "okay";
+	};
+
+	cp_manager: cp_manager {
+		compatible = "qcom,cp_manager";
+		label = "cp_manager";
+		status = "okay";
 	};
 };
 
