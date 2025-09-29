@@ -34,12 +34,12 @@ static irqreturn_t ant_div_interrupt(int irq, void *data)
 	struct ant_div_check_info *ant_div_info = data;
 	int ant_div_gpio;
 	ant_div_gpio = gpio_get_value_cansleep(ant_div_info->irq_gpio);
-	pr_err("Macle irq interrupt gpio = %d\n", ant_div_gpio);
+	//pr_err("Macle irq interrupt gpio = %d\n", ant_div_gpio);
 	if(ant_div_gpio == ant_div_info->ant_div_check_state){
 		return IRQ_HANDLED;
 	}else{
 		ant_div_info->ant_div_check_state = ant_div_gpio;
-		pr_err("Macle report key s ");
+		//pr_err("Macle report key s ");
 	}
 	if (ant_div_gpio) {
 			input_report_key(ant_div_info->ipdev, DIV_ANT_CONNECT, 1);
