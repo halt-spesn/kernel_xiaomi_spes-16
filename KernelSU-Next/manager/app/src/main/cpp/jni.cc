@@ -8,7 +8,11 @@
 #include "ksu.h"
 
 #define LOG_TAG "KernelSU-Next"
+#ifdef NDEBUG
+#define LOGD(...) (void)0
+#else
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#endif
 
 extern "C"
 JNIEXPORT jboolean JNICALL
@@ -37,6 +41,13 @@ JNIEXPORT jstring JNICALL
 Java_com_rifsxd_ksunext_Natives_getHookMode(JNIEnv *env, jobject) {
     const char* mode = get_hook_mode();
     return env->NewStringUTF(mode);
+}
+
+extern "C"
+JNIEXPORT jstring JNICALL
+Java_com_rifsxd_ksunext_Natives_getVersionTag(JNIEnv *env, jobject) {
+    const char* tag = get_version_tag();
+    return env->NewStringUTF(tag);
 }
 
 extern "C"
