@@ -4,7 +4,7 @@
 #include "nopmi_chg_jeita.h"
 
 #define STEP_TABLE_MAX 2
-#define STEP_DOWN_CURR_MA 100
+#define STEP_DOWN_CURR_MA 200
 #define CV_BATT_VOLT_HYSTERESIS 20
 
 #define CC_CV_STEP_VOTER	"CC_CV_STEP_VOTER"
@@ -71,6 +71,7 @@ struct nopmi_chg {
 	int batt_health;
 	int input_suspend;
 	int mtbf_cur;
+	int vbat_mv;
 	/*jeita config*/
 	struct nopmi_chg_jeita_st jeita_ctl;
 
