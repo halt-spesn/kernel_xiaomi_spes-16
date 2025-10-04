@@ -49,12 +49,12 @@ static int debug_mask = PR_OEM;
 module_param_named(debug_mask, debug_mask, int, 0600);
 
 #define bq_dbg(reason, fmt, ...)				\
-	do {					\
-		if (debug_mask & (reason))		\
-			pr_info(fmt, ##__VA_ARGS__);	\
-		else					\
-			pr_debug(fmt, ##__VA_ARGS__);	\
-	} while (0)
+do {								\
+	if (debug_mask & (reason))				\
+		pr_info_ratelimited(fmt, ##__VA_ARGS__);	\
+	else							\
+		pr_debug_ratelimited(fmt, ##__VA_ARGS__);	\
+} while (0)
 
 static struct bq2589x *g_bq;
 static struct pe_ctrl pe;
@@ -537,7 +537,7 @@ int main_set_charge_voltage(int volt)
 		return -1;
 
 	ret = bq2589x_set_chargevoltage(g_bq, volt);
-	bq_dbg(PR_OEM, "end main_set_charge_voltage, ret=%d\n", ret);
+	pr_debug("end main_set_charge_voltage, ret=%d\n", ret);
 
 	return ret;
 }
@@ -642,7 +642,7 @@ u8 bq2589x_get_charging_status(struct bq2589x *bq)
 				if (ret < 0) {
 					pr_err("failed to set vindpm volt 4600mV\n");
 				} else {
-					pr_info("charge full, set vindpm volt to 4600mV\n");
+					bq_dbg(PR_OEM, "charge full, set vindpm volt to 4600mV\n");
 				}
 			}
 			return POWER_SUPPLY_STATUS_FULL;
@@ -1024,7 +1024,7 @@ static void bq2589x_dump_regs(struct bq2589x *bq)
 	for (addr = 0x0; addr <= 0x14; addr++) {
 		ret = bq2589x_read_byte(bq, addr, &val);
 		if (ret == 0)
-			bq_dbg(PR_OEM, "Reg[%.2x] = 0x%.2x\n", addr, val);
+			bq_dbg(PR_OEM, "Reg[%02x] = 0x%02x\n", (unsigned int)addr, (unsigned int)val);
 	}
 }
 #endif
@@ -1068,7 +1068,7 @@ static int bq2589x_init_device(struct bq2589x *bq)
 
 	ret = bq2589x_set_prechg_current(bq, 200);
 	if (ret < 0) {
-		bq_dbg(PR_OEM, "failed to set prechg current: %d\n", ret);
+		pr_err("failed to set prechg current: %d\n", ret);
 		return ret;
 	}
 
@@ -1091,8 +1091,8 @@ static int bq2589x_init_device(struct bq2589x *bq)
 
 	/* 2022.5.18 longcheer tangyanchang edit start */
 	if (bq->part_no == SYV690) {
-		bq_dbg(PR_OEM, "init syv690 HV_TYPE 9/12V\n");
-		bq2589x_update_bits(bq, BQ2589X_REG_02, 0x4, 0 << 2);//HV_TYPE 0-9V/1-12V
+		pr_info("init syv690 HV_TYPE 9/12V\n");
+		bq2589x_update_bits(bq, BQ2589X_REG_02, 0x4, 0 << 2); //HV_TYPE 0-9V/1-12V
 	}
 	/* 2022.5.18 longcheer tangyanchang edit end */
 
@@ -1114,7 +1114,7 @@ static int bq2589x_charge_status(struct bq2589x *bq)
 
 	bq2589x_read_byte(bq, BQ2589X_REG_0B, &val);
 	bq2589x_read_byte(bq, BQ2589X_REG_03, &val1);
-	bq_dbg(PR_OEM, "get charge status: REG_0B=0x%x, REG_03=0x%x\n", val, val1);
+	bq_dbg(PR_OEM, "REG_0B=0x%x, REG_03=0x%x\n", val, val1);
 
 	val &= BQ2589X_CHRG_STAT_MASK;
 	val >>= BQ2589X_CHRG_STAT_SHIFT;
@@ -1186,7 +1186,7 @@ static int bq2589x_wall_get_property(struct power_supply *psy,
 		break;
 	case POWER_SUPPLY_PROP_BATT_CHARGE_TYPE:
 		val->intval = bq2589x_charge_status(bq);
-		bq_dbg(PR_OEM, "get_property CHARGE_TYPE: %d\n", val->intval);
+		bq_dbg(PR_OEM, "CHARGE_TYPE: %d\n", val->intval);
 		break;
 	default:
 		return -EINVAL;
@@ -1275,7 +1275,7 @@ static int bq2589x_psy_register(struct bq2589x *bq)
 
 static void bq2589x_psy_unregister(struct bq2589x *bq)
 {
-	bq_dbg(PR_OEM, "start unregister\n");
+	pr_info("start unregister\n");
 }
 
 static ssize_t bq2589x_show_registers(struct device *dev,
@@ -1295,7 +1295,8 @@ static ssize_t bq2589x_show_registers(struct device *dev,
 	for (addr = 0x0; addr <= 0x14; addr++) {
 		ret = bq2589x_read_byte(g_bq, addr, &val);
 		if (ret == 0) {
-			len = snprintf(tmpbuf, PAGE_SIZE - idx, "Reg[0x%.2x] = 0x%.2x\n", addr, val);
+			//len = snprintf(tmpbuf, PAGE_SIZE - idx, "Reg[0x%.2x] = 0x%.2x\n", addr, val);
+			len = snprintf(tmpbuf, PAGE_SIZE - idx, "Reg[0x%02x] = 0x%02x\n", (unsigned int)addr, (unsigned int)val);
 			memcpy(&buf[idx], tmpbuf, len);
 			idx += len;
 		}
@@ -1370,15 +1371,15 @@ static int bq2589x_parse_dt(struct device *dev, struct bq2589x *bq)
 
 	bq->irq_gpio = of_get_named_gpio(np, "intr-gpio", 0);
 	if (ret < 0) {
-		bq_dbg(PR_OEM, "no intr_gpio info\n");
+		pr_err("no intr_gpio info\n");
 		return ret;
 	} else {
-		bq_dbg(PR_OEM, "intr_gpio info: %d\n", bq->irq_gpio);
+		pr_info("intr_gpio info: %d\n", bq->irq_gpio);
 	}
 
 	bq->usb_switch1 = of_get_named_gpio(np, "usb-switch1", 0);
 	if (ret < 0) {
-		bq_dbg(PR_OEM, "no usb-switch1 info\n");
+		pr_err("no usb-switch1 info\n");
 		return ret;
 	}
 
@@ -1390,7 +1391,7 @@ static void bq2589x_usb_switch(struct bq2589x *bq, bool en)
 	int ret = 0;
 
 	//msleep(5);
-	bq_dbg(PR_OEM, "%d\n", en);
+	pr_info("%d\n", en);
 	mutex_lock(&bq->usb_switch_lock);
 	ret = gpio_direction_output(bq->usb_switch1, en);
 	bq->usb_switch_flag = en;
@@ -1603,8 +1604,8 @@ static void bq2589x_adapter_out_workfunc(struct work_struct *work)
 	int ret;
 
 //modify by HTH-209427/HTH-209841 at 2022/05/12 begin
-	ret = bq2589x_set_input_volt_limit(bq, 4600);
 	vote(bq->usb_icl_votable, PROFILE_CHG_VOTER, true, 0);
+	ret = bq2589x_set_input_volt_limit(bq, 4600);
 	if (ret < 0)
 		bq_dbg(PR_OEM, "reset vindpm threshold to 4600 failed: %d\n", ret);
 	else
@@ -1701,7 +1702,7 @@ static void time_delay_work(struct work_struct *work)
 
 static void bq2589x_usb_changed_workfunc(struct work_struct *work)
 {
-	struct bq2589x *bq = container_of(work, struct bq2589x,usb_changed_work.work);
+	struct bq2589x *bq = container_of(work, struct bq2589x, usb_changed_work.work);
 	static int notify_count = 0;
 	union power_supply_propval val = {0, };
 	int ret = 0, chg_type = 0;
@@ -1836,7 +1837,7 @@ static void bq2589x_monitor_workfunc(struct work_struct *work)
 			pr_err("get battery temp fail\n");
 		}
 		batt_temp = propval.intval;
-		bq_dbg(PR_OEM, "get battery temp: %d\n", batt_temp);
+		bq_dbg(PR_OEM, "batt_temp: %d\n", (batt_temp / 10));
 	}
 
 	if (batt_temp < 0) {
@@ -2095,6 +2096,7 @@ static void bq2589x_charger_irq_workfunc(struct work_struct *work)
 	u8 fault = 0;
 	u8 vbus_status = 0;
 	u8 charge_status = 0;
+	u8 pg_status = 0;
 	int ret;
 	//static int count =0;
 	enum power_supply_type chg_type = POWER_SUPPLY_TYPE_UNKNOWN;
@@ -2111,6 +2113,10 @@ static void bq2589x_charger_irq_workfunc(struct work_struct *work)
 	//bq2589x_dump_regs(bq);
 	//prev_chg_type = bq->vbus_type;
 	bq->vbus_type = (status & BQ2589X_VBUS_STAT_MASK) >> BQ2589X_VBUS_STAT_SHIFT;
+	pg_status = (status & BQ2589X_PG_STAT_MASK) >> BQ2589X_PG_STAT_SHIFT;
+	if (!pg_status)
+		bq->vbus_type = BQ2589X_VBUS_NONE;
+
 	chg_type = bq2589x_get_charger_type(bq);
 	if (bq->vbus_type == BQ2589X_VBUS_USB_CDP || bq->vbus_type == BQ2589X_VBUS_USB_SDP) {
 		bq2589x_usb_switch(bq, false);
@@ -2199,12 +2205,15 @@ static void bq2589x_charger_irq_workfunc(struct work_struct *work)
 		bq_dbg(PR_OEM, "fast charging\n");
 	} else if (charge_status == BQ2589X_CHRG_STAT_CHGDONE) {
 		bq_dbg(PR_OEM, "charge done!\n");
+		if (!IS_ERR_OR_NULL(bq->wall_psy)) {
+			power_supply_changed(bq->wall_psy);
+		}
 	}
 
 	if (fault & 0x40) {
 		bq2589x_usb_switch(g_bq, true);
 		bq2589x_set_otg(bq, false);
-		bq2589x_enable_charger(bq);
+		//bq2589x_enable_charger(bq);
 	}
 
 	if (fault & 0x80) {
@@ -2242,7 +2251,7 @@ static void set_pd_active(struct bq2589x *bq, int pd_active)
 		val.intval = pd_active;
 		rc = power_supply_set_property(bq->usb_psy, POWER_SUPPLY_PROP_PD_ACTIVE, &val);
 		if (rc < 0)
-			bq_dbg(PR_OEM, "Couldn't set USB Present status, rc=%d\n", rc);
+			pr_err("couldn't set USB present status, rc=%d\n", rc);
 		bq2589x_set_fast_charge_mode(bq, pd_active);
 	}
 }
@@ -2283,7 +2292,7 @@ static int bq2589x_set_cc_orientation(struct bq2589x *bq, int cc_orientation)
 	ret = power_supply_set_property(bq->usb_psy,
 			POWER_SUPPLY_PROP_TYPEC_CC_ORIENTATION, &propval);
 	if (ret < 0)
-		pr_err("set prop CC_ORIENTATION fail: %d\n", ret);
+		pr_err("set prop CC_ORIENTATION fail: (%d)\n", ret);
 
 	return ret;
 }
@@ -2305,7 +2314,7 @@ static int bq2589x_set_typec_mode(struct bq2589x *bq, enum power_supply_typec_mo
 	ret = power_supply_set_property(bq->usb_psy,
 			POWER_SUPPLY_PROP_TYPEC_MODE, &propval);
 	if (ret < 0)
-		pr_err("set prop TYPEC_MODE fail: %d\n", ret);
+		pr_err("set prop TYPEC_MODE fail: (%d)\n", ret);
 
 	return ret;
 }
@@ -2318,7 +2327,7 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 	enum power_supply_typec_mode typec_mode = POWER_SUPPLY_TYPEC_NONE;
 	int cc_orientation = 0;
 
-	//bq_dbg(PR_OEM, "event:%d\n",event);
+	//bq_dbg(PR_OEM, "event:%d\n", event);
 	switch (event) {
 	case TCP_NOTIFY_SINK_VBUS:
 		bq_dbg(PR_OEM, "TCP_NOTIFY_SINK_VBUS\n");
@@ -2330,6 +2339,9 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 			bq_dbg(PR_OEM, "disconnected\n");
 			break;
 		case PD_CONNECT_HARD_RESET:
+			bq_dbg(PR_OEM, "hardreset\n");
+			if (bq->pd_active)
+				set_pd_active(bq, 0);
 			break;
 		case PD_CONNECT_PE_READY_SNK:
 			bq_dbg(PR_OEM, "PD2.0 connect\n");
@@ -2354,7 +2366,10 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 				noti->typec_state.new_state == TYPEC_ATTACHED_NORP_SRC)) {
 			bq_dbg(PR_OEM, "USB Plug in, pol = %d, state = %d\n",
 					noti->typec_state.polarity, noti->typec_state.new_state);
-			pm_stay_awake(bq->dev);
+			if (!bq->is_awake) {
+				bq->is_awake = 1;
+				pm_stay_awake(bq->dev);
+			}
 			bq2589x_init_device(bq);
 			bq2589x_usb_switch(bq, true);
 			bq2589x_force_dpdm_done(bq);
@@ -2373,7 +2388,10 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 			typec_mode = POWER_SUPPLY_TYPEC_NONE;
 			bq_dbg(PR_OEM, "USB Plug out\n");
 			bq2589x_usb_switch(bq, false);
-			pm_relax(bq->dev);
+			if (bq->is_awake) {
+				bq->is_awake = 0;
+				pm_relax(bq->dev);
+			}
 		} else if (noti->typec_state.old_state == TYPEC_ATTACHED_SRC &&
 				noti->typec_state.new_state == TYPEC_ATTACHED_SNK) {
 			bq_dbg(PR_OEM, "Source_to_Sink\n");
@@ -2388,7 +2406,8 @@ static int pd_tcp_notifier_call(struct notifier_block *pnb,
 			bq2589x_set_typec_mode(bq, typec_mode);
 		break;
 	case TCP_NOTIFY_EXT_DISCHARGE:
-		bq_dbg(PR_OEM, "usb plug out\n");
+		bq2589x_usb_switch(bq, true);
+		bq_dbg(PR_OEM, "Ext USB Plug out\n");
 		break;
 	case TCP_NOTIFY_SOURCE_VBUS:
 		bq_dbg(PR_OEM, "TCP_NOTIFY_SOURCE_VBUS\n");
@@ -2428,7 +2447,7 @@ static int fcc_vote_callback(struct votable *votable, void *data,
 
 	rc = bq2589x_set_charge_current(bq, fcc_ua);
 	if (rc < 0) {
-		bq_dbg(PR_OEM, "failed to set charge current\n");
+		pr_err("failed to set charge current\n");
 		return rc;
 	}
 
@@ -2448,7 +2467,7 @@ static int chg_dis_vote_callback(struct votable *votable, void *data,
 	}
 
 	if (rc < 0) {
-		bq_dbg(PR_OEM, "failed to disable: %d\n", disable);
+		pr_err("failed to disable: (%d)\n", rc);
 		return rc;
 	}
 
@@ -2467,7 +2486,7 @@ static int fv_vote_callback(struct votable *votable, void *data,
 
 	rc = bq2589x_set_chargevoltage(bq, fv_mv);
 	if (rc < 0) {
-		bq_dbg(PR_OEM, "failed to set chargevoltage\n");
+		pr_err("failed to set chargevoltage\n");
 		return rc;
 	}
 
@@ -2489,7 +2508,7 @@ static int usb_icl_vote_callback(struct votable *votable, void *data,
 
 	rc = main_set_input_current_limit(icl_ma);
 	if (rc < 0) {
-		bq_dbg(PR_OEM, "failed to set input current limit\n");
+		pr_err("failed to set input current limit\n");
 		return rc;
 	}
 
@@ -2519,10 +2538,10 @@ static int bq2589x_charger_probe(struct i2c_client *client,
 	int irqn;
 	int ret;
 
-	bq_dbg(PR_OEM, "start..\n");
+	pr_info("start..\n");
 	bq = devm_kzalloc(&client->dev, sizeof(struct bq2589x), GFP_KERNEL);
 	if (!bq) {
-		bq_dbg(PR_OEM, "out of memory!!\n");
+		pr_err("out of memory!!\n");
 		return -ENOMEM;
 	}
 
@@ -2537,18 +2556,18 @@ static int bq2589x_charger_probe(struct i2c_client *client,
 	if (!ret && bq->part_no == BQ25890) {
 		bq->status |= BQ2589X_STATUS_EXIST;
 		//bq->is_bq25890h = true;
-		bq_dbg(PR_OEM, "charger device bq25890 detected, revision: %d\n", bq->revision);
+		pr_info("charger device bq25890 detected, revision: (%d)\n", bq->revision);
 	} else if (!ret && bq->part_no == SYV690) {
 		bq->status |= BQ2589X_STATUS_EXIST;
 		//bq->is_bq25890h = false;
-		bq_dbg(PR_OEM, "charger device SYV690 detected, revision: %d\n", bq->revision);
+		pr_info("charger device SYV690 detected, revision: (%d)\n", bq->revision);
 		nopmi_set_charger_ic_type(NOPMI_CHARGER_IC_SYV);
 	} else if (!ret && bq->part_no == SC89890H) {
 		bq->status |= BQ2589X_STATUS_EXIST;
 		//bq->is_bq25890h = false;
-		bq_dbg(PR_OEM, "charger device SC89890H detected, revision: %d\n", bq->revision);
+		pr_info("charger device SC89890H detected, revision: (%d)\n", bq->revision);
 	} else {
-		bq_dbg(PR_OEM, "no bq25890 charger device found: %d\n", ret);
+		pr_err("no bq25890 charger device found: (%d)\n", ret);
 		ret = -ENODEV;
 		goto err_free;
 	}
@@ -2558,7 +2577,7 @@ static int bq2589x_charger_probe(struct i2c_client *client,
 #if defined(CONFIG_TCPC_RT1711H)
 	bq->tcpc_dev = tcpc_dev_get_by_name("type_c_port0");
 	if (IS_ERR_OR_NULL(bq->tcpc_dev)) {
-		bq_dbg(PR_OEM, "tcpc device not ready, defer\n");
+		pr_err("tcpc device not ready, defer\n");
 		ret = -EPROBE_DEFER;
 		goto err_free;
 	}
@@ -2569,19 +2588,19 @@ static int bq2589x_charger_probe(struct i2c_client *client,
 
 	ret = bq2589x_init_device(bq);
 	if (ret) {
-		bq_dbg(PR_OEM, "device init failure: %d\n", ret);
+		pr_err("device init failure: (%d)\n", ret);
 		goto err_init;
 	}
 
 	ret = gpio_request(bq->irq_gpio, "bq2589x irq pin");
 	if (ret) {
-		bq_dbg(PR_OEM, "%d gpio request failed\n", bq->irq_gpio);
+		pr_err("%d gpio request failed\n", bq->irq_gpio);
 		goto err_gpio;
 	}
 
 	irqn = gpio_to_irq(bq->irq_gpio);
 	if (irqn < 0) {
-		bq_dbg(PR_OEM, "%d gpio_to_irq failed\n", irqn);
+		pr_err("%d gpio_to_irq failed\n", irqn);
 		ret = irqn;
 		goto err_gpio;
 	}
@@ -2591,6 +2610,11 @@ static int bq2589x_charger_probe(struct i2c_client *client,
 	if (ret)
 		goto err_psy;
 
+	ret = device_init_wakeup(bq->dev, true);
+	if (ret < 0)
+		pr_err("device init wakeup failure: (%d)\n", ret);
+
+	bq->is_awake = 0;
 	g_bq = bq;
 
 	INIT_WORK(&bq->irq_work, bq2589x_charger_irq_workfunc);
@@ -2649,7 +2673,7 @@ static int bq2589x_charger_probe(struct i2c_client *client,
 
 	ret = sysfs_create_group(&bq->dev->kobj, &bq2589x_attr_group);
 	if (ret) {
-		bq_dbg(PR_OEM, "failed to register sysfs, err: %d\n", ret);
+		pr_err("failed to register sysfs: (%d)\n", ret);
 		goto err_sysfs;
 	}
 
@@ -2658,10 +2682,10 @@ static int bq2589x_charger_probe(struct i2c_client *client,
 //modify by HTH-209427/HTH-209841 at 2022/05/12 end
 	ret = request_irq(client->irq, bq2589x_charger_interrupt, IRQF_TRIGGER_FALLING | IRQF_ONESHOT, "bq2589x_charger1_irq", bq);
 	if (ret) {
-		bq_dbg(PR_OEM, "request IRQ %d failed: %d\n", client->irq, ret);
+		pr_err("request IRQ %d failed: (%d)\n", client->irq, ret);
 		goto err_irq;
 	} else {
-		bq_dbg(PR_OEM, "IRQ = %d\n", client->irq);
+		pr_info("IRQ interrupt: (%d)\n", client->irq);
 	}
 	//schedule_work(&bq->irq_work); // 2020.09.15 change for zsa/*in case of adapter has been in when power off*/
 
@@ -2669,17 +2693,16 @@ static int bq2589x_charger_probe(struct i2c_client *client,
 	bq->pd_nb.notifier_call = pd_tcp_notifier_call;
 	ret = register_tcp_dev_notifier(bq->tcpc_dev, &bq->pd_nb, TCP_NOTIFY_TYPE_ALL);
 	if (ret < 0) {
-		bq_dbg(PR_OEM, "register tcpc notifer fail\n");
+		pr_err("register tcpc notifer fail\n");
 		ret = -EINVAL;
 		goto err_get_tcpc_dev;
 	}
 #endif
 
-	device_init_wakeup(g_bq->dev, true);
 	enable_irq_wake(irqn);
 	schedule_delayed_work(&bq->time_delay_work, msecs_to_jiffies(4000));
 
-	bq_dbg(PR_OEM, "success.\n");
+	pr_info("success.\n");
 	return 0;
 
 #if defined(CONFIG_TCPC_RT1711H)
@@ -2729,7 +2752,7 @@ err_free:
 	mutex_destroy(&bq->usb_switch_lock);
 	g_bq = NULL;
 	//devm_kfree(&client->dev, bq);
-	bq_dbg(PR_OEM, "fail!!\n");
+	pr_err("fail!!\n");
 	return ret;
 }
 
@@ -2737,7 +2760,7 @@ static void bq2589x_charger_shutdown(struct i2c_client *client)
 {
 	struct bq2589x *bq = i2c_get_clientdata(client);
 
-	bq_dbg(PR_OEM, "start..\n");
+	pr_info("start..\n");
 	//bq2589x_disable_otg(bq);
 	bq2589x_set_otg(bq, false);
 	bq2589x_exit_hiz_mode(bq);
