@@ -2,7 +2,7 @@
  * SC8551 battery charging driver
 */
 
-#define pr_fmt(fmt)	"[sc8551]: %s: " fmt, __func__
+#define pr_fmt(fmt)	"[sc8551]: " fmt
 
 #include <linux/gpio.h>
 #include <linux/i2c.h>
@@ -2100,7 +2100,7 @@ static int sc8551_charger_probe(struct i2c_client *client,
 	struct device_node *node = client->dev.of_node;
 	int ret;
 
-	pr_info("start..\n");
+	pr_info("%s: start..\n", __func__);
 
 	sc = devm_kzalloc(&client->dev, sizeof(struct sc8551), GFP_KERNEL);
 	if (!sc) {
@@ -2122,7 +2122,7 @@ static int sc8551_charger_probe(struct i2c_client *client,
 
 	ret = sc8551_detect_device(sc);
 	if (ret) {
-		sc_err("No sc8551 device found!\n");
+		pr_err("%s: no sc8551 device found!\n", __func__);
 		ret = -ENODEV;
 		goto err_free;
 	}
@@ -2132,18 +2132,17 @@ static int sc8551_charger_probe(struct i2c_client *client,
 
 	match = of_match_node(sc8551_charger_match_table, node);
 	if (match == NULL) {
-		sc_err("device tree match not found!\n");
+		pr_err("%s: device tree match not found!\n", __func__);
 		ret = -ENODEV;
 		goto err_free;
 	}
 
-/*
-	sc8551_get_work_mode(sc, &sc->mode);
+	/*sc8551_get_work_mode(sc, &sc->mode);
 	if (sc->mode != *(int *)match->data) {
-		sc_err("device operation mode mismatch with dts configuration\n");
+		pr_err("%s: device operation mode mismatch with dts configuration\n", __func__);
 		return -EINVAL;
-	}
-*/
+	}*/
+
 	sc->mode = *(int *)match->data;
 	ret = sc8551_parse_dt(sc, &client->dev);
 	if (ret) {
@@ -2153,7 +2152,7 @@ static int sc8551_charger_probe(struct i2c_client *client,
 
 	ret = sc8551_init_device(sc);
 	if (ret) {
-		sc_err("Failed to init device\n");
+		pr_err("%s: failed to init device\n", __func__);
 		goto err_free;
 	}
 
@@ -2167,8 +2166,8 @@ static int sc8551_charger_probe(struct i2c_client *client,
 				IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
 				"sc8551 charger irq", sc);
 		if (ret < 0) {
-			sc_err("request irq for irq=%d failed, ret =%d\n",
-							client->irq, ret);
+			pr_err("%s: request irq for irq=%d failed, ret=%d\n",
+					__func__, client->irq, ret);
 			goto err_register_irq;
 		}
 		enable_irq_wake(client->irq);
@@ -2178,7 +2177,7 @@ static int sc8551_charger_probe(struct i2c_client *client,
 
 	determine_initial_status(sc);
 
-	pr_info("successfully, Part Num: %d\n", sc->part_no);
+	pr_info("%s: successfully, part_num: %d\n", __func__, sc->part_no);
 
 	return 0;
 
@@ -2191,7 +2190,7 @@ err_free:
 	mutex_destroy(&sc->i2c_rw_lock);
 
 	devm_kfree(&client->dev, sc);
-	pr_err("fail!!\n");
+	pr_err("%s: fail!!\n", __func__);
 	return ret;
 }
 
@@ -2208,7 +2207,7 @@ static int sc8551_suspend(struct device *dev)
 	mutex_lock(&sc->irq_complete);
 	sc->resume_completed = false;
 	mutex_unlock(&sc->irq_complete);
-	sc_info("Suspend successfully!\n");
+	pr_info_ratelimited("%s: Suspend successfully!\n", __func__);
 
 	return 0;
 }
@@ -2219,7 +2218,7 @@ static int sc8551_suspend_noirq(struct device *dev)
 	struct sc8551 *sc = i2c_get_clientdata(client);
 
 	if (sc->irq_waiting) {
-		pr_err_ratelimited("Aborting suspend, an interrupt was detected while suspending\n");
+		pr_err_ratelimited("%s: Aborting suspend, an interrupt was detected while suspending\n", __func__);
 		return -EBUSY;
 	}
 	return 0;
@@ -2242,7 +2241,7 @@ static int sc8551_resume(struct device *dev)
 	}
 
 	power_supply_changed(sc->fc2_psy);
-	sc_info("Resume successfully!\n");
+	pr_info_ratelimited("%s: Resume successfully!\n", __func__);
 
 	return 0;
 }
