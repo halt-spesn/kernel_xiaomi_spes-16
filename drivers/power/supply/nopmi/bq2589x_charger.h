@@ -97,7 +97,6 @@ struct bq2589x {
 	int		rsoc;
 	int		pd_active;
 	bool	enabled;
-	bool	is_awake;
 
 	struct mutex i2c_rw_lock;
 	struct mutex usb_switch_lock;
